@@ -2,9 +2,13 @@ import os
 import re
 import time
 import json
+import socket
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
+
+# Define timeout global para conexões de rede (evita travamentos infinitos na API do Sheets)
+socket.setdefaulttimeout(30)
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -30,6 +34,24 @@ def clean_registro(reg_str):
     if not reg_str:
         return ""
     return re.sub(r"\D", "", str(reg_str))
+
+def safe_update_cell(sheet, row, col, value, retries=3, delay=3):
+    """
+    Atualiza uma célula no Google Sheets com tratamento de erros e retentativas automáticas.
+    Garante que falhas temporárias de rede não interrompam o script.
+    """
+    for i in range(retries):
+        try:
+            sheet.update_cell(row, col, value)
+            return True
+        except Exception as e:
+            logger.warning(
+                f"Erro ao atualizar célula ({row}, {col}) com '{value}': {e}. "
+                f"Tentando novamente {i+1}/{retries} em {delay}s..."
+            )
+            time.sleep(delay)
+    logger.error(f"Falha definitiva ao atualizar célula ({row}, {col}) após {retries} tentativas.")
+    return False
 
 def get_google_sheets_client():
     """Autentica e retorna o cliente do Google Sheets."""
@@ -70,26 +92,20 @@ def search_registry_visual(page, registro_limpo):
     Preenche o input, clica em buscar e lê o resultado da tabela.
     """
     try:
-        # 1. Limpa os filtros de busca anteriores clicando no botão "Limpar"
-        logger.info("Limpando filtros de busca anteriores...")
-        page.click('input.btn-default')
-        time.sleep(0.5)
-        
-        # 2. Digita o registro no input do AngularJS
+        # 1. Digita o registro no input do AngularJS
         logger.info(f"Digitando registro '{registro_limpo}'...")
-        page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo)
+        page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo, timeout=5000)
         
-        # 3. Clica no botão de consulta
+        # 2. Clica no botão de consulta
         logger.info("Clicando em Consultar...")
-        page.click('input.btn-primary')
+        page.click('input.btn-primary', timeout=5000)
         
-        # 4. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
-        # Usamos uma espera combinada para evitar travar em timeouts longos
+        # 3. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
         start_time = time.time()
         found_data = False
         no_records = False
         
-        while time.time() - start_time < 8:
+        while time.time() - start_time < 10:
             # Verifica se a tabela com linhas de dados (td) apareceu
             if page.query_selector("table tbody tr td"):
                 found_data = True
@@ -109,11 +125,10 @@ def search_registry_visual(page, registro_limpo):
             logger.warning(f"Timeout aguardando resultados para o registro '{registro_limpo}'.")
             return None, "Timeout/Erro"
             
-        # 5. Extrai as linhas da tabela
+        # 4. Extrai as linhas da tabela
         rows = page.query_selector_all("table tbody tr")
         for row in rows:
             cells = row.query_selector_all("td")
-            # Uma linha de dados legítima do portal de Saúde possui pelo menos 8 colunas
             if len(cells) >= 8:
                 registro_tabela = clean_registro(cells[2].inner_text().strip())
                 
@@ -208,17 +223,6 @@ def main():
         
         page = context.new_page()
         
-        logger.info("Acessando aba de Saúde da ANVISA...")
-        try:
-            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
-            # Dá um tempo para que os elementos do AngularJS terminem a inicialização
-            time.sleep(4)
-            logger.info("Portal de Saúde inicializado com sucesso.")
-        except Exception as e:
-            logger.error(f"Erro crítico ao abrir o portal de consultas da ANVISA: {e}")
-            browser.close()
-            return
-
         # 5. Itera sobre cada produto na planilha
         # O gspread usa indexação baseada em 1. A linha 1 é o cabeçalho, então os dados iniciam na linha 2.
         for idx, row in enumerate(records, start=2):
@@ -231,22 +235,38 @@ def main():
 
             logger.info(f"Processando linha {idx}: Registro '{registro_original}'...")
             
+            # Recarrega a página antes de fazer a busca para garantir um estado limpo
+            try:
+                logger.info("Carregando o portal de consultas da ANVISA...")
+                page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
+                # Dá um tempo para que os elementos do AngularJS terminem a inicialização
+                time.sleep(3.5)
+            except Exception as e:
+                logger.warning(f"Erro ao carregar o portal na primeira tentativa: {e}. Tentando recarregar...")
+                try:
+                    page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
+                    time.sleep(5)
+                except Exception as e2:
+                    logger.error(f"Não foi possível acessar a ANVISA após duas tentativas: {e2}")
+                    safe_update_cell(sheet, idx, col_validade_idx, "Erro de Conexão")
+                    continue
+            
             # Faz a busca visual no portal
             validade, situacao = search_registry_visual(page, registro_limpo)
             
             # Atualiza os valores correspondentes de volta no Google Sheets
             if validade:
-                sheet.update_cell(idx, col_validade_idx, validade)
+                safe_update_cell(sheet, idx, col_validade_idx, validade)
                 if col_situacao_idx:
-                    sheet.update_cell(idx, col_situacao_idx, situacao)
+                    safe_update_cell(sheet, idx, col_situacao_idx, situacao)
             else:
-                sheet.update_cell(idx, col_validade_idx, "Não Encontrado")
+                safe_update_cell(sheet, idx, col_validade_idx, "Não Encontrado")
                 if col_situacao_idx:
-                    sheet.update_cell(idx, col_situacao_idx, "Inativo ou Não Encontrado")
+                    safe_update_cell(sheet, idx, col_situacao_idx, "Inativo ou Não Encontrado")
             
             if col_atualizacao_idx:
                 data_hoje = datetime.now().strftime("%d/%m/%Y %H:%M")
-                sheet.update_cell(idx, col_atualizacao_idx, data_hoje)
+                safe_update_cell(sheet, idx, col_atualizacao_idx, data_hoje)
                 
             # Rate limiting amigável para evitar bloqueio por flood de IP
             time.sleep(2)

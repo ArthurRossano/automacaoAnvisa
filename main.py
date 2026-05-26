@@ -53,6 +53,27 @@ def safe_update_cell(sheet, row, col, value, retries=3, delay=3):
     logger.error(f"Falha definitiva ao atualizar célula ({row}, {col}) após {retries} tentativas.")
     return False
 
+def commit_batch(sheet, cells_list):
+    """
+    Grava as células acumuladas no Google Sheets em uma única requisição (Batch Update).
+    Limpa a lista de células após a gravação com sucesso.
+    """
+    if not cells_list:
+        return True
+    
+    logger.info(f"Gravando lote de {len(cells_list)} atualizações no Google Sheets...")
+    for i in range(3):
+        try:
+            sheet.update_cells(cells_list)
+            cells_list.clear()  # Limpa o lote após salvar com sucesso
+            logger.info("Lote de atualizações gravado com sucesso!")
+            return True
+        except Exception as e:
+            logger.warning(f"Erro ao gravar lote: {e}. Tentando novamente {i+1}/3 em 3s...")
+            time.sleep(3)
+    logger.error("Falha definitiva ao gravar o lote no Google Sheets.")
+    return False
+
 def get_google_sheets_client():
     """Autentica e retorna o cliente do Google Sheets."""
     scopes = [
@@ -92,20 +113,33 @@ def search_registry_visual(page, registro_limpo):
     Preenche o input, clica em buscar e lê o resultado da tabela.
     """
     try:
-        # 1. Digita o registro no input do AngularJS
+        # 1. Tenta limpar os filtros anteriores de forma rápida.
+        # Se falhar (botão indisponível ou página travada), recarrega a página.
+        try:
+            page.click('input.btn-default', timeout=2000)
+            time.sleep(0.3)
+        except Exception:
+            logger.warning("Página travada ou botão Limpar indisponível. Recarregando portal...")
+            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=30000)
+            time.sleep(3)
+        
+        # 2. Aguarda o input estar disponível dinamicamente (evita sleep estático longo)
+        page.wait_for_selector('input[ng-model="filter.numeroRegistro"]', state="visible", timeout=5000)
+        
+        # 3. Digita o registro no input do AngularJS
         logger.info(f"Digitando registro '{registro_limpo}'...")
-        page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo, timeout=5000)
+        page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo, timeout=3000)
         
-        # 2. Clica no botão de consulta
+        # 4. Clica no botão de consulta
         logger.info("Clicando em Consultar...")
-        page.click('input.btn-primary', timeout=5000)
+        page.click('input.btn-primary', timeout=3000)
         
-        # 3. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
+        # 5. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
         start_time = time.time()
         found_data = False
         no_records = False
         
-        while time.time() - start_time < 10:
+        while time.time() - start_time < 8:
             # Verifica se a tabela com linhas de dados (td) apareceu
             if page.query_selector("table tbody tr td"):
                 found_data = True
@@ -115,7 +149,7 @@ def search_registry_visual(page, registro_limpo):
             if "Não foram encontrados registros" in page_content or "não foram encontrados" in page_content.lower():
                 no_records = True
                 break
-            time.sleep(0.5)
+            time.sleep(0.3)
             
         if no_records:
             logger.info(f"Registro '{registro_limpo}' não foi encontrado no portal.")
@@ -125,7 +159,7 @@ def search_registry_visual(page, registro_limpo):
             logger.warning(f"Timeout aguardando resultados para o registro '{registro_limpo}'.")
             return None, "Timeout/Erro"
             
-        # 4. Extrai as linhas da tabela
+        # 6. Extrai as linhas da tabela
         rows = page.query_selector_all("table tbody tr")
         for row in rows:
             cells = row.query_selector_all("td")
@@ -223,6 +257,21 @@ def main():
         
         page = context.new_page()
         
+        logger.info("Acessando aba de Saúde da ANVISA pela primeira vez...")
+        try:
+            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
+            # Dá um tempo para que os elementos do AngularJS terminem a inicialização na primeira carga
+            time.sleep(4)
+            logger.info("Portal de Saúde inicializado com sucesso.")
+        except Exception as e:
+            logger.error(f"Erro crítico ao abrir o portal de consultas da ANVISA: {e}")
+            browser.close()
+            return
+
+        # Lista para armazenar as células que serão atualizadas em lote
+        cells_to_update = []
+        batch_size = 20  # Grava no Google Sheets em lotes de 20 registros
+
         # 5. Itera sobre cada produto na planilha
         # O gspread usa indexação baseada em 1. A linha 1 é o cabeçalho, então os dados iniciam na linha 2.
         for idx, row in enumerate(records, start=2):
@@ -263,41 +312,33 @@ def main():
 
             logger.info(f"Processando linha {idx}: Registro '{registro_original}'...")
             
-            # Recarrega a página antes de fazer a busca para garantir um estado limpo
-            try:
-                logger.info("Carregando o portal de consultas da ANVISA...")
-                page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
-                # Dá um tempo para que os elementos do AngularJS terminem a inicialização
-                time.sleep(3.5)
-            except Exception as e:
-                logger.warning(f"Erro ao carregar o portal na primeira tentativa: {e}. Tentando recarregar...")
-                try:
-                    page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
-                    time.sleep(5)
-                except Exception as e2:
-                    logger.error(f"Não foi possível acessar a ANVISA após duas tentativas: {e2}")
-                    safe_update_cell(sheet, idx, col_validade_idx, "Erro de Conexão")
-                    continue
-            
             # Faz a busca visual no portal
             validade, situacao = search_registry_visual(page, registro_limpo)
             
-            # Atualiza os valores correspondentes de volta no Google Sheets
+            # Acumula os valores correspondentes de volta na memória para atualização em lote
             if validade:
-                safe_update_cell(sheet, idx, col_validade_idx, validade)
+                cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value=validade))
                 if col_situacao_idx:
-                    safe_update_cell(sheet, idx, col_situacao_idx, situacao)
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value=situacao))
             else:
-                safe_update_cell(sheet, idx, col_validade_idx, "Não Encontrado")
+                cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value="Não Encontrado"))
                 if col_situacao_idx:
-                    safe_update_cell(sheet, idx, col_situacao_idx, "Inativo ou Não Encontrado")
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value="Inativo ou Não Encontrado"))
             
             if col_atualizacao_idx:
                 data_hoje = datetime.now().strftime("%d/%m/%Y %H:%M")
-                safe_update_cell(sheet, idx, col_atualizacao_idx, data_hoje)
+                cells_to_update.append(gspread.cell.Cell(row=idx, col=col_atualizacao_idx, value=data_hoje))
+            
+            # Executa a gravação em lote se atingir a capacidade definida
+            if len(cells_to_update) >= (batch_size * 2):
+                commit_batch(sheet, cells_to_update)
                 
-            # Rate limiting amigável para evitar bloqueio por flood de IP
-            time.sleep(2)
+            # Rate limiting amigável otimizado
+            time.sleep(0.8)
+            
+        # Grava qualquer célula restante pendente no final da execução
+        if cells_to_update:
+            commit_batch(sheet, cells_to_update)
             
         browser.close()
         logger.info("Automação concluída com sucesso!")

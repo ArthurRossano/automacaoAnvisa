@@ -362,6 +362,16 @@
             box-shadow: 0 0 10px rgba(189, 0, 255, 0.3);
         }
 
+        .part-3-color {
+            background: linear-gradient(90deg, #ffc837, #ff8008);
+            box-shadow: 0 0 10px rgba(255, 128, 8, 0.3);
+        }
+
+        .part-4-color {
+            background: linear-gradient(90deg, var(--neon-green), #00ff87);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+        }
+
         /* Console Log style */
         .console-container {
             flex: 1;
@@ -527,7 +537,7 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-value glow-purple" id="stat-half-split">0</div>
-                        <div class="stat-label">Por Lote (~50%)</div>
+                        <div class="stat-label">Por Lote (~25%)</div>
                     </div>
                 </div>
             </div>
@@ -541,7 +551,7 @@
             <div class="glass-card scraper-card">
                 <div class="scraper-header">
                     <div class="card-title">
-                        <i class="fa-solid fa-circle-1" style="color: var(--neon-teal);"></i> Parte 1: Primeira Metade
+                        <i class="fa-solid fa-circle-1" style="color: var(--neon-teal);"></i> Parte 1: Primeiro Lote
                     </div>
                     <div id="status-part-1" class="status-badge">Inativo</div>
                 </div>
@@ -585,7 +595,7 @@
             <div class="glass-card scraper-card">
                 <div class="scraper-header">
                     <div class="card-title">
-                        <i class="fa-solid fa-circle-2" style="color: var(--neon-purple);"></i> Parte 2: Segunda Metade
+                        <i class="fa-solid fa-circle-2" style="color: var(--neon-purple);"></i> Parte 2: Segundo Lote
                     </div>
                     <div id="status-part-2" class="status-badge">Inativo</div>
                 </div>
@@ -625,6 +635,94 @@
                 </div>
             </div>
 
+            <!-- Scraper Parte 3 -->
+            <div class="glass-card scraper-card">
+                <div class="scraper-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-circle-3" style="color: #ff8008;"></i> Parte 3: Terceiro Lote
+                    </div>
+                    <div id="status-part-3" class="status-badge">Inativo</div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-info">
+                        <span id="lines-progress-3">Linhas: - / -</span>
+                        <span class="progress-percentage" id="percent-3">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar part-3-color" id="bar-part-3"></div>
+                    </div>
+                </div>
+
+                <div class="console-container">
+                    <div class="console-header">
+                        <div class="console-dots">
+                            <div class="console-dot red"></div>
+                            <div class="console-dot yellow"></div>
+                            <div class="console-dot green"></div>
+                        </div>
+                        <span>console_part_3.log</span>
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div class="console-body" id="console-part-3">
+                        <div class="console-line info">Aguardando inicialização da Parte 3...</div>
+                    </div>
+                </div>
+
+                <div class="card-controls">
+                    <button class="btn" id="btn-start-3" onclick="startProcess(3)" style="background: linear-gradient(135deg, #ffc837, #ff8008); color: #080c14;">
+                        <i class="fa-solid fa-play"></i> Iniciar Parte 3
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop-3" onclick="stopProcess(3)" disabled style="opacity: 0.5;">
+                        <i class="fa-solid fa-stop"></i> Parar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scraper Parte 4 -->
+            <div class="glass-card scraper-card">
+                <div class="scraper-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-circle-4" style="color: var(--neon-green);"></i> Parte 4: Quarto Lote
+                    </div>
+                    <div id="status-part-4" class="status-badge">Inativo</div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-info">
+                        <span id="lines-progress-4">Linhas: - / -</span>
+                        <span class="progress-percentage" id="percent-4">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar part-4-color" id="bar-part-4"></div>
+                    </div>
+                </div>
+
+                <div class="console-container">
+                    <div class="console-header">
+                        <div class="console-dots">
+                            <div class="console-dot red"></div>
+                            <div class="console-dot yellow"></div>
+                            <div class="console-dot green"></div>
+                        </div>
+                        <span>console_part_4.log</span>
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div class="console-body" id="console-part-4">
+                        <div class="console-line info">Aguardando inicialização da Parte 4...</div>
+                    </div>
+                </div>
+
+                <div class="card-controls">
+                    <button class="btn" id="btn-start-4" onclick="startProcess(4)" style="background: linear-gradient(135deg, var(--neon-green), #00ff87); color: #080c14;">
+                        <i class="fa-solid fa-play"></i> Iniciar Parte 4
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop-4" onclick="stopProcess(4)" disabled style="opacity: 0.5;">
+                        <i class="fa-solid fa-stop"></i> Parar
+                    </button>
+                </div>
+            </div>
+
         </div>
 
     </div>
@@ -643,13 +741,17 @@
         // Fontes SSE para os consoles
         let eventSources = {
             1: null,
-            2: null
+            2: null,
+            3: null,
+            4: null
         };
 
         // Estado do progresso
         let progressData = {
             1: { start: 0, end: 0, current: 0 },
-            2: { start: 0, end: 0, current: 0 }
+            2: { start: 0, end: 0, current: 0 },
+            3: { start: 0, end: 0, current: 0 },
+            4: { start: 0, end: 0, current: 0 }
         };
 
         // Ao carregar a página
@@ -739,15 +841,21 @@
                     document.getElementById('stat-total-rows').innerText = data.total_rows;
                     document.getElementById('stat-half-split').innerText = data.half_rows;
                     
-                    // Atualiza os metadados de progresso com base na divisão calculada
-                    const half = data.half_rows;
-                    progressData[1].start = 2;
-                    progressData[1].end = half + 1;
-                    progressData[2].start = half + 2;
-                    progressData[2].end = data.total_rows + 1;
+                    // Calcula a divisão dinâmica em 4 lotes de forma idêntica ao main.py
+                    const total_tasks = data.total_rows;
+                    const chunk_size = Math.ceil(total_tasks / 4);
                     
-                    updateProgressLabels(1);
-                    updateProgressLabels(2);
+                    for (let p = 1; p <= 4; p++) {
+                        const start_row = (p - 1) * chunk_size + 2;
+                        const end_row = Math.min(start_row + chunk_size - 1, total_tasks + 1);
+                        
+                        progressData[p].start = start_row;
+                        progressData[p].end = end_row;
+                        progressData[p].current = start_row;
+                        
+                        updateProgressLabels(p);
+                        updateProgress(p);
+                    }
                 } else {
                     document.getElementById('stat-total-rows').innerText = "Erro";
                     document.getElementById('stat-half-split').innerText = "Erro";
@@ -771,6 +879,14 @@
                 if (data.part2.running) {
                     setProcessUiActive(2);
                     connectSse(2);
+                }
+                if (data.part3.running) {
+                    setProcessUiActive(3);
+                    connectSse(3);
+                }
+                if (data.part4.running) {
+                    setProcessUiActive(4);
+                    connectSse(4);
                 }
             } catch (error) {
                 console.error("Erro ao verificar processos ativos:", error);

@@ -185,7 +185,8 @@ def search_registry_visual(page, registro_limpo):
 def main():
     # Configura os argumentos de linha de comando para paralelismo dinâmico
     parser = argparse.ArgumentParser(description="Automação ANVISA com paralelização dinâmica.")
-    parser.add_argument("--part", type=int, choices=[1, 2], help="Parte do processamento: 1 (primeira metade) ou 2 (segunda metade)")
+    parser.add_argument("--part", type=int, help="Índice da parte a ser processada (1 a total-parts)")
+    parser.add_argument("--total-parts", type=int, default=4, help="Número total de divisões da planilha (padrão: 4)")
     args = parser.parse_args()
 
     if not SPREADSHEET_NAME:
@@ -212,20 +213,34 @@ def main():
     # Cria lista de tarefas mapeando para o índice físico das linhas no Google Sheets (linha 1 é cabeçalho, dados iniciam na 2)
     all_tasks = list(enumerate(records, start=2))
     
-    # Se o argumento --part for informado, divide as tarefas dinamicamente ao meio
+    # Se o argumento --part for informado, divide as tarefas dinamicamente de acordo com o total de partes
     if args.part:
+        total_parts = args.total_parts
+        part_idx = args.part
+        
+        if part_idx < 1 or part_idx > total_parts:
+            logger.error(f"Erro: O índice da parte ({part_idx}) deve ser entre 1 e total-parts ({total_parts}).")
+            return
+            
         total_tasks = len(all_tasks)
-        half = total_tasks // 2
-        if args.part == 1:
-            tasks_to_process = all_tasks[:half]
-            first_line = tasks_to_process[0][0] if tasks_to_process else 2
-            last_line = tasks_to_process[-1][0] if tasks_to_process else 2
-            logger.info(f"Modo Paralelo (Parte 1/2) ativo. Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros).")
+        # Calcula o tamanho de cada fatia (divisão inteira com teto)
+        chunk_size = (total_tasks + total_parts - 1) // total_parts
+        
+        start_idx = (part_idx - 1) * chunk_size
+        end_idx = min(start_idx + chunk_size, total_tasks)
+        
+        tasks_to_process = all_tasks[start_idx:end_idx]
+        
+        if tasks_to_process:
+            first_line = tasks_to_process[0][0]
+            last_line = tasks_to_process[-1][0]
+            logger.info(
+                f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. "
+                f"Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros)."
+            )
         else:
-            tasks_to_process = all_tasks[half:]
-            first_line = tasks_to_process[0][0] if tasks_to_process else 2
-            last_line = tasks_to_process[-1][0] if tasks_to_process else 2
-            logger.info(f"Modo Paralelo (Parte 2/2) ativo. Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros).")
+            logger.info(f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. Nenhuma tarefa para processar neste lote.")
+            tasks_to_process = []
     else:
         tasks_to_process = all_tasks
         logger.info(f"Modo Padrão ativo. Processando todas as {len(tasks_to_process)} linhas da planilha.")

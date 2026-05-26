@@ -14,19 +14,25 @@ app = Flask(__name__)
 # Controle de subprocessos ativos
 processes = {
     1: None,
-    2: None
+    2: None,
+    3: None,
+    4: None
 }
 
 # Listas de ouvintes SSE ativos (filas de mensagens)
 log_queues = {
     1: [],
-    2: []
+    2: [],
+    3: [],
+    4: []
 }
 
 # Histórico de logs para manter o console cheio ao recarregar
 log_history = {
     1: [],
-    2: []
+    2: [],
+    3: [],
+    4: []
 }
 
 def update_dotenv(key, value):
@@ -58,7 +64,7 @@ def run_process_thread(part):
     """Thread em segundo plano que executa o script da automação e captura o stdout/stderr em tempo real."""
     global processes, log_history, log_queues
     
-    cmd = ["python", "main.py", "--part", str(part)]
+    cmd = ["python", "main.py", "--part", str(part), "--total-parts", "4"]
     
     # Força a saída padrão do Python a usar UTF-8 para evitar caracteres corrompidos no console do Windows
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
@@ -160,7 +166,7 @@ def api_stats():
         sheet = client.open(sheet_name).worksheet(tab_name)
         records = sheet.get_all_records()
         total_rows = len(records)
-        half_rows = total_rows // 2
+        half_rows = (total_rows + 3) // 4  # tamanho estimado de cada lote (25%)
         
         return jsonify({
             "success": True,
@@ -173,10 +179,12 @@ def api_stats():
 
 @app.route('/api/status')
 def api_status():
-    """Retorna se os processos da Parte 1 e Parte 2 estão ativos no momento."""
+    """Retorna se os processos da Parte 1 ao 4 estão ativos no momento."""
     return jsonify({
         "part1": {"running": processes[1] is not None},
-        "part2": {"running": processes[2] is not None}
+        "part2": {"running": processes[2] is not None},
+        "part3": {"running": processes[3] is not None},
+        "part4": {"running": processes[4] is not None}
     })
 
 
@@ -184,7 +192,7 @@ def api_status():
 def api_start():
     """Dispara a execução do script para a metade selecionada em uma thread separada."""
     part = request.args.get('part', type=int)
-    if part not in [1, 2]:
+    if part not in [1, 2, 3, 4]:
         return jsonify({"success": False, "message": "Parte do processo inválida."})
         
     if processes[part] is not None:
@@ -202,7 +210,7 @@ def api_start():
 def api_stop():
     """Interrompe e mata o subprocesso ativo da metade correspondente."""
     part = request.args.get('part', type=int)
-    if part not in [1, 2]:
+    if part not in [1, 2, 3, 4]:
         return jsonify({"success": False, "message": "Parte do processo inválida."})
         
     proc = processes[part]
@@ -225,7 +233,7 @@ def api_stop():
 @app.route('/api/logs/<int:part>')
 def api_logs(part):
     """Retorna o fluxo de eventos de log via SSE (Server-Sent Events) para o console do frontend."""
-    if part not in [1, 2]:
+    if part not in [1, 2, 3, 4]:
         return "Parte inválida", 400
 
     def event_stream():

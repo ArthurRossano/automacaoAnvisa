@@ -233,6 +233,34 @@ def main():
                 logger.info(f"Linha {idx}: Registro em branco. Pulando...")
                 continue
 
+            # Verifica a última atualização se a coluna existir
+            if col_atualizacao_idx:
+                ult_atualizacao_str = str(row.get(headers[col_atualizacao_idx - 1], "")).strip()
+                if ult_atualizacao_str:
+                    try:
+                        dt_atualizacao = None
+                        # Tenta parsear no formato com hora ou apenas data
+                        for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
+                            try:
+                                dt_atualizacao = datetime.strptime(ult_atualizacao_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+                        
+                        if dt_atualizacao:
+                            diferenca = datetime.now() - dt_atualizacao
+                            if diferenca.days <= 7:
+                                logger.info(
+                                    f"Linha {idx}: Registro '{registro_original}' atualizado há {diferenca.days} dias "
+                                    f"(há 7 dias ou menos). Pulando consulta..."
+                                )
+                                continue
+                    except Exception as e:
+                        logger.warning(
+                            f"Linha {idx}: Falha ao calcular intervalo da última atualização '{ult_atualizacao_str}': {e}. "
+                            f"Processando consulta por segurança..."
+                        )
+
             logger.info(f"Processando linha {idx}: Registro '{registro_original}'...")
             
             # Recarrega a página antes de fazer a busca para garantir um estado limpo

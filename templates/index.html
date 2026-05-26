@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Automação ANVISA</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            
+            --neon-teal: #00ffd2;
+            --neon-purple: #bd00ff;
+            --neon-pink: #ff007a;
+            --neon-green: #39ff14;
+            --neon-red: #ff3131;
+            
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(189, 0, 255, 0.08) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(0, 255, 210, 0.08) 0px, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 2rem 4rem 1rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(8, 12, 20, 0.5);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--neon-teal), var(--neon-purple));
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 210, 0.3);
+            animation: pulse 2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 210, 0.3); }
+            100% { transform: scale(1.05); box-shadow: 0 0 25px rgba(189, 0, 255, 0.5); }
+        }
+
+        .logo-title h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--neon-teal), #a044ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-title p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .container {
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 4rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Top Config & Stats Grid */
+        .top-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--glass-shadow);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: #fff;
+        }
+
+        .card-title i {
+            background: linear-gradient(135deg, var(--neon-teal), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Form Config */
+        .config-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .form-group input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.3s;
+            width: 100%;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--neon-teal);
+            box-shadow: 0 0 10px rgba(0, 255, 210, 0.15);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--neon-teal), #00bfff);
+            color: #080c14;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
+            height: 44px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(0, 255, 210, 0.4);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, var(--neon-red), #ff7b7b);
+            color: #fff;
+        }
+
+        .btn-stop:hover {
+            box-shadow: 0 0 15px rgba(255, 49, 49, 0.4);
+        }
+
+        /* Stats Card */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.2rem;
+        }
+
+        .stat-value.glow-teal {
+            text-shadow: 0 0 10px rgba(0, 255, 210, 0.4);
+            color: var(--neon-teal);
+        }
+
+        .stat-value.glow-purple {
+            text-shadow: 0 0 10px rgba(189, 0, 255, 0.4);
+            color: #d156ff;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Parallel Scrapers Grid */
+        .scrapers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        .scraper-card {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .scraper-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .status-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            border-color: var(--neon-green);
+            background: rgba(57, 255, 20, 0.05);
+            color: var(--neon-green);
+            text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+        }
+
+        .status-badge.active i {
+            animation: rotate 2s linear infinite;
+        }
+
+        .status-badge.completed {
+            border-color: var(--neon-teal);
+            background: rgba(0, 255, 210, 0.05);
+            color: var(--neon-teal);
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Progress Area */
+        .progress-container {
+            margin-bottom: 1.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.6rem;
+            font-size: 0.9rem;
+        }
+
+        .progress-percentage {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.05);
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .part-1-color {
+            background: linear-gradient(90deg, var(--neon-teal), #00bfff);
+            box-shadow: 0 0 10px rgba(0, 255, 210, 0.3);
+        }
+
+        .part-2-color {
+            background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink));
+            box-shadow: 0 0 10px rgba(189, 0, 255, 0.3);
+        }
+
+        /* Console Log style */
+        .console-container {
+            flex: 1;
+            background: #04060b;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .console-header {
+            background: #0d111d;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .console-dots {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .console-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .console-dot.red { background-color: #ff5f56; }
+        .console-dot.yellow { background-color: #ffbd2e; }
+        .console-dot.green { background-color: #27c93f; }
+
+        .console-body {
+            flex: 1;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #a5d6ff;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            scroll-behavior: smooth;
+        }
+
+        .console-line {
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .console-line.info { color: #a5d6ff; }
+        .console-line.warning { color: #f0883e; }
+        .console-line.error { color: #ff7b72; font-weight: bold; }
+        .console-line.success { color: #7ee787; }
+
+        /* Card Controls */
+        .card-controls {
+            margin-top: 1.2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .card-controls button {
+            flex: 1;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--neon-teal);
+            box-shadow: 0 0 15px rgba(0, 255, 210, 0.2);
+            color: #fff;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast i {
+            color: var(--neon-teal);
+            font-size: 1.2rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="logo-title">
+                <h1>ANVISA Expiry Bot</h1>
+                <p>Dashboard de Monitoramento Local</p>
+            </div>
+        </div>
+        <div>
+            <span id="global-status-badge" class="status-badge"><i class="fa-solid fa-circle"></i> SISTEMA ONLINE</span>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <!-- Top Config and Stats Row -->
+        <div class="top-row">
+            
+            <!-- Config Card -->
+            <div class="glass-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-gears"></i> Configurações da Automação (.env)
+                </div>
+                <form id="config-form" class="config-form">
+                    <div class="form-group">
+                        <label for="input-sheet-name">Nome do Arquivo Google Sheets</label>
+                        <input type="text" id="input-sheet-name" placeholder="Carregando..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-tab-name">Nome da Aba (Tab)</label>
+                        <input type="text" id="input-tab-name" placeholder="Carregando..." required>
+                    </div>
+                    <button type="submit" class="btn" id="btn-save-config">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Stats Card -->
+            <div class="glass-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-chart-simple"></i> Estatísticas Globais
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value glow-teal" id="stat-total-rows">0</div>
+                        <div class="stat-label">Produtos Totais</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value glow-purple" id="stat-half-split">0</div>
+                        <div class="stat-label">Por Lote (~50%)</div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Scrapers Grid -->
+        <div class="scrapers-grid">
+            
+            <!-- Scraper Parte 1 -->
+            <div class="glass-card scraper-card">
+                <div class="scraper-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-circle-1" style="color: var(--neon-teal);"></i> Parte 1: Primeira Metade
+                    </div>
+                    <div id="status-part-1" class="status-badge">Inativo</div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-info">
+                        <span id="lines-progress-1">Linhas: - / -</span>
+                        <span class="progress-percentage" id="percent-1">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar part-1-color" id="bar-part-1"></div>
+                    </div>
+                </div>
+
+                <div class="console-container">
+                    <div class="console-header">
+                        <div class="console-dots">
+                            <div class="console-dot red"></div>
+                            <div class="console-dot yellow"></div>
+                            <div class="console-dot green"></div>
+                        </div>
+                        <span>console_part_1.log</span>
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div class="console-body" id="console-part-1">
+                        <div class="console-line info">Aguardando inicialização da Parte 1...</div>
+                    </div>
+                </div>
+
+                <div class="card-controls">
+                    <button class="btn" id="btn-start-1" onclick="startProcess(1)">
+                        <i class="fa-solid fa-play"></i> Iniciar Parte 1
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop-1" onclick="stopProcess(1)" disabled style="opacity: 0.5;">
+                        <i class="fa-solid fa-stop"></i> Parar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scraper Parte 2 -->
+            <div class="glass-card scraper-card">
+                <div class="scraper-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-circle-2" style="color: var(--neon-purple);"></i> Parte 2: Segunda Metade
+                    </div>
+                    <div id="status-part-2" class="status-badge">Inativo</div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-info">
+                        <span id="lines-progress-2">Linhas: - / -</span>
+                        <span class="progress-percentage" id="percent-2">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar part-2-color" id="bar-part-2"></div>
+                    </div>
+                </div>
+
+                <div class="console-container">
+                    <div class="console-header">
+                        <div class="console-dots">
+                            <div class="console-dot red"></div>
+                            <div class="console-dot yellow"></div>
+                            <div class="console-dot green"></div>
+                        </div>
+                        <span>console_part_2.log</span>
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div class="console-body" id="console-part-2">
+                        <div class="console-line info">Aguardando inicialização da Parte 2...</div>
+                    </div>
+                </div>
+
+                <div class="card-controls">
+                    <button class="btn" id="btn-start-2" onclick="startProcess(2)" style="background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink)); color: #fff;">
+                        <i class="fa-solid fa-play"></i> Iniciar Parte 2
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop-2" onclick="stopProcess(2)" disabled style="opacity: 0.5;">
+                        <i class="fa-solid fa-stop"></i> Parar
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toast-message">Configurações salvas com sucesso!</span>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Automação ANVISA. Desenvolvido para Arthur Chaves.</p>
+    </footer>
+
+    <script>
+        // Fontes SSE para os consoles
+        let eventSources = {
+            1: null,
+            2: null
+        };
+
+        // Estado do progresso
+        let progressData = {
+            1: { start: 0, end: 0, current: 0 },
+            2: { start: 0, end: 0, current: 0 }
+        };
+
+        // Ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            loadStats();
+            checkProcessesRunning();
+            
+            // Formulário de configuração
+            document.getElementById('config-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveConfig();
+            });
+        });
+
+        // Mostra o Toast Notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            toast.style.borderColor = isError ? 'var(--neon-red)' : 'var(--neon-teal)';
+            toast.style.boxShadow = isError ? '0 0 15px rgba(255, 49, 49, 0.2)' : '0 0 15px rgba(0, 255, 210, 0.2)';
+            icon.className = isError ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-check';
+            icon.style.color = isError ? 'var(--neon-red)' : 'var(--neon-teal)';
+            
+            document.getElementById('toast-message').innerText = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Carrega configurações do servidor
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                document.getElementById('input-sheet-name').value = data.spreadsheet_name;
+                document.getElementById('input-tab-name').value = data.sheet_tab_name;
+            } catch (error) {
+                console.error("Erro ao carregar configurações:", error);
+            }
+        }
+
+        // Salva configurações no servidor
+        async function saveConfig() {
+            const btn = document.getElementById('btn-save-config');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+            
+            const payload = {
+                spreadsheet_name: document.getElementById('input-sheet-name').value,
+                sheet_tab_name: document.getElementById('input-tab-name').value
+            };
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast("Configurações do .env atualizadas com sucesso!");
+                    loadStats(); // Recarrega estatísticas com a nova planilha
+                } else {
+                    showToast("Erro ao salvar: " + data.message, true);
+                }
+            } catch (error) {
+                showToast("Falha de comunicação com o servidor", true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar';
+            }
+        }
+
+        // Carrega estatísticas globais de linhas da planilha
+        async function loadStats() {
+            try {
+                document.getElementById('stat-total-rows').innerText = "...";
+                document.getElementById('stat-half-split').innerText = "...";
+                
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('stat-total-rows').innerText = data.total_rows;
+                    document.getElementById('stat-half-split').innerText = data.half_rows;
+                    
+                    // Atualiza os metadados de progresso com base na divisão calculada
+                    const half = data.half_rows;
+                    progressData[1].start = 2;
+                    progressData[1].end = half + 1;
+                    progressData[2].start = half + 2;
+                    progressData[2].end = data.total_rows + 1;
+                    
+                    updateProgressLabels(1);
+                    updateProgressLabels(2);
+                } else {
+                    document.getElementById('stat-total-rows').innerText = "Erro";
+                    document.getElementById('stat-half-split').innerText = "Erro";
+                    console.error("Erro do servidor:", data.message);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar estatísticas:", error);
+            }
+        }
+
+        // Verifica se os processos já estão em execução
+        async function checkProcessesRunning() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                if (data.part1.running) {
+                    setProcessUiActive(1);
+                    connectSse(1);
+                }
+                if (data.part2.running) {
+                    setProcessUiActive(2);
+                    connectSse(2);
+                }
+            } catch (error) {
+                console.error("Erro ao verificar processos ativos:", error);
+            }
+        }
+
+        // Inicia o processo
+        async function startProcess(part) {
+            const btn = document.getElementById(`btn-start-${part}`);
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...`;
+            
+            try {
+                const response = await fetch(`/api/start?part=${part}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    setProcessUiActive(part);
+                    clearConsole(part);
+                    appendConsoleLine(part, "info", `Iniciando subprocesso da Parte ${part}...`);
+                    connectSse(part);
+                    showToast(`Parte ${part} da automação iniciada!`);
+                } else {
+                    showToast(`Erro ao iniciar: ${data.message}`, true);
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-play"></i> Iniciar Parte ${part}`;
+                }
+            } catch (error) {
+                showToast("Erro de rede ao iniciar", true);
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> Iniciar Parte ${part}`;
+            }
+        }
+
+        // Interrompe o processo
+        async function stopProcess(part) {
+            const btn = document.getElementById(`btn-stop-${part}`);
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Parando...`;
+            
+            try {
+                const response = await fetch(`/api/stop?part=${part}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`Parte ${part} interrompida pelo usuário.`);
+                    disconnectSse(part);
+                    setProcessUiInactive(part);
+                    appendConsoleLine(part, "error", "Processo cancelado pelo usuário.");
+                } else {
+                    showToast(`Erro ao parar: ${data.message}`, true);
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-stop"></i> Parar`;
+                }
+            } catch (error) {
+                showToast("Erro de rede ao interromper", true);
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-stop"></i> Parar`;
+            }
+        }
+
+        // Conecta ao fluxo de eventos SSE
+        function connectSse(part) {
+            if (eventSources[part]) {
+                eventSources[part].close();
+            }
+            
+            eventSources[part] = new EventSource(`/api/logs/${part}`);
+            
+            eventSources[part].addEventListener('log', (event) => {
+                const text = event.data;
+                
+                // Determina classe de estilo baseada no log
+                let cls = 'info';
+                if (text.includes('[ERROR]')) cls = 'error';
+                else if (text.includes('[WARNING]')) cls = 'warning';
+                else if (text.includes('localizado!') || text.includes('sucesso!')) cls = 'success';
+                
+                appendConsoleLine(part, cls, text);
+                
+                // Parse do progresso
+                // Formato do log: "Processando linha 234: Registro..."
+                if (text.includes('Processando linha')) {
+                    const match = text.match(/Processando linha (\d+):/);
+                    if (match && match[1]) {
+                        const line = parseInt(match[1]);
+                        progressData[part].current = line;
+                        updateProgress(part);
+                    }
+                } else if (text.includes('atualizado há') && text.includes('Pulando')) {
+                    // Formato: "Linha 23: Registro '...' atualizado..."
+                    const match = text.match(/Linha (\d+):/);
+                    if (match && match[1]) {
+                        const line = parseInt(match[1]);
+                        progressData[part].current = line;
+                        updateProgress(part);
+                    }
+                }
+            });
+            
+            eventSources[part].addEventListener('finished', (event) => {
+                const data = JSON.parse(event.data);
+                disconnectSse(part);
+                setProcessUiInactive(part);
+                
+                if (data.success) {
+                    appendConsoleLine(part, "success", "--- PROCESSAMENTO CONCLUÍDO COM SUCESSO! ---");
+                    // Preenche a barra em 100%
+                    progressData[part].current = progressData[part].end;
+                    updateProgress(part);
+                    showToast(`Parte ${part} finalizada com sucesso!`);
+                } else {
+                    appendConsoleLine(part, "error", `--- PROCESSO MORREU COM CÓDIGO ${data.code} ---`);
+                    showToast(`Parte ${part} parou com erro (Código: ${data.code})`, true);
+                }
+            });
+            
+            eventSources[part].onerror = (err) => {
+                console.error(`SSE erro na Parte ${part}:`, err);
+                // Reconecta silenciosamente se for uma desconexão temporária
+            };
+        }
+
+        // Desconecta o SSE
+        function disconnectSse(part) {
+            if (eventSources[part]) {
+                eventSources[part].close();
+                eventSources[part] = null;
+            }
+        }
+
+        // Atualiza a interface quando o processo está rodando
+        function setProcessUiActive(part) {
+            const badge = document.getElementById(`status-part-${part}`);
+            badge.className = "status-badge active";
+            badge.innerHTML = `<i class="fa-solid fa-spinner"></i> Rodando`;
+            
+            document.getElementById(`btn-start-${part}`).disabled = true;
+            document.getElementById(`btn-start-${part}`).style.opacity = "0.5";
+            
+            const stopBtn = document.getElementById(`btn-stop-${part}`);
+            stopBtn.disabled = false;
+            stopBtn.style.opacity = "1";
+        }
+
+        // Atualiza a interface quando o processo está inativo
+        function setProcessUiInactive(part) {
+            const badge = document.getElementById(`status-part-${part}`);
+            badge.className = "status-badge";
+            badge.innerHTML = "Inativo";
+            
+            const startBtn = document.getElementById(`btn-start-${part}`);
+            startBtn.disabled = false;
+            startBtn.style.opacity = "1";
+            startBtn.innerHTML = `<i class="fa-solid fa-play"></i> Iniciar Parte ${part}`;
+            
+            const stopBtn = document.getElementById(`btn-stop-${part}`);
+            stopBtn.disabled = true;
+            stopBtn.style.opacity = "0.5";
+            stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> Parar`;
+        }
+
+        // Limpa o console de logs
+        function clearConsole(part) {
+            document.getElementById(`console-part-${part}`).innerHTML = "";
+        }
+
+        // Adiciona linha ao console com rolagem automática
+        function appendConsoleLine(part, cls, text) {
+            const consoleBody = document.getElementById(`console-part-${part}`);
+            
+            const line = document.createElement('div');
+            line.className = `console-line ${cls}`;
+            line.innerText = text;
+            
+            consoleBody.appendChild(line);
+            
+            // Rola para baixo
+            consoleBody.scrollTop = consoleBody.scrollHeight;
+            
+            // Mantém no máximo 500 linhas no console para não pesar o navegador
+            if (consoleBody.children.length > 500) {
+                consoleBody.removeChild(consoleBody.firstChild);
+            }
+        }
+
+        // Atualiza os labels textuais do progresso
+        function updateProgressLabels(part) {
+            const start = progressData[part].start;
+            const end = progressData[part].end;
+            const current = progressData[part].current || start;
+            document.getElementById(`lines-progress-${part}`).innerText = `Linhas: ${current} / ${end}`;
+        }
+
+        // Atualiza a barra e a porcentagem de progresso
+        function updateProgress(part) {
+            const start = progressData[part].start;
+            const end = progressData[part].end;
+            let current = progressData[part].current;
+            
+            if (current < start) current = start;
+            if (current > end) current = end;
+            
+            const total = end - start + 1;
+            const processed = current - start;
+            
+            let percent = 0;
+            if (total > 0 && processed >= 0) {
+                percent = Math.round((processed / total) * 100);
+            }
+            if (percent > 100) percent = 100;
+            
+            document.getElementById(`percent-${part}`).innerText = `${percent}%`;
+            document.getElementById(`bar-part-${part}`).style.width = `${percent}%`;
+            document.getElementById(`lines-progress-${part}`).innerText = `Linhas: ${current} / ${end}`;
+        }
+    </script>
+</body>
+</html>

@@ -60,6 +60,9 @@ def run_process_thread(part):
     
     cmd = ["python", "main.py", "--part", str(part)]
     
+    # Força a saída padrão do Python a usar UTF-8 para evitar caracteres corrompidos no console do Windows
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    
     try:
         proc = subprocess.Popen(
             cmd,
@@ -68,7 +71,8 @@ def run_process_thread(part):
             text=True,
             bufsize=1,
             encoding="utf-8",
-            errors="ignore"
+            errors="ignore",
+            env=env
         )
         processes[part] = proc
         log_history[part] = []
@@ -78,9 +82,6 @@ def run_process_thread(part):
             line_clean = line.strip()
             if not line_clean:
                 continue
-            
-            # Remove caracteres estranhos de codificação do log
-            line_clean = line_clean.replace("", "á").replace("Vlido", "Válido").replace("Situao", "Situação").replace("Sade", "Saúde")
             
             log_history[part].append(line_clean)
             

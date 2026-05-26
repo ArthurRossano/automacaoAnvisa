@@ -4,6 +4,7 @@ import time
 import json
 import socket
 import logging
+import argparse
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -182,6 +183,11 @@ def search_registry_visual(page, registro_limpo):
         return None, "Erro na Busca"
 
 def main():
+    # Configura os argumentos de linha de comando para paralelismo dinâmico
+    parser = argparse.ArgumentParser(description="Automação ANVISA com paralelização dinâmica.")
+    parser.add_argument("--part", type=int, choices=[1, 2], help="Parte do processamento: 1 (primeira metade) ou 2 (segunda metade)")
+    args = parser.parse_args()
+
     if not SPREADSHEET_NAME:
         logger.error("Erro: A variável de ambiente SPREADSHEET_NAME não foi configurada.")
         return
@@ -202,7 +208,28 @@ def main():
         return
         
     headers = sheet.row_values(1)
+
+    # Cria lista de tarefas mapeando para o índice físico das linhas no Google Sheets (linha 1 é cabeçalho, dados iniciam na 2)
+    all_tasks = list(enumerate(records, start=2))
     
+    # Se o argumento --part for informado, divide as tarefas dinamicamente ao meio
+    if args.part:
+        total_tasks = len(all_tasks)
+        half = total_tasks // 2
+        if args.part == 1:
+            tasks_to_process = all_tasks[:half]
+            first_line = tasks_to_process[0][0] if tasks_to_process else 2
+            last_line = tasks_to_process[-1][0] if tasks_to_process else 2
+            logger.info(f"Modo Paralelo (Parte 1/2) ativo. Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros).")
+        else:
+            tasks_to_process = all_tasks[half:]
+            first_line = tasks_to_process[0][0] if tasks_to_process else 2
+            last_line = tasks_to_process[-1][0] if tasks_to_process else 2
+            logger.info(f"Modo Paralelo (Parte 2/2) ativo. Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros).")
+    else:
+        tasks_to_process = all_tasks
+        logger.info(f"Modo Padrão ativo. Processando todas as {len(tasks_to_process)} linhas da planilha.")
+
     # 3. Mapeia dinamicamente os índices das colunas de interesse
     col_registro_idx = None
     col_validade_idx = None
@@ -272,9 +299,8 @@ def main():
         cells_to_update = []
         batch_size = 20  # Grava no Google Sheets em lotes de 20 registros
 
-        # 5. Itera sobre cada produto na planilha
-        # O gspread usa indexação baseada em 1. A linha 1 é o cabeçalho, então os dados iniciam na linha 2.
-        for idx, row in enumerate(records, start=2):
+        # 5. Itera sobre cada produto fatiado na planilha
+        for idx, row in tasks_to_process:
             registro_original = str(row.get(headers[col_registro_idx - 1], "")).strip()
             registro_limpo = clean_registro(registro_original)
             

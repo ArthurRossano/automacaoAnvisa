@@ -481,6 +481,73 @@
             font-size: 0.85rem;
             border-top: 1px solid var(--border-color);
         }
+
+        /* Global Actions Bar */
+        .actions-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1.5rem;
+            background: rgba(17, 24, 39, 0.85);
+            border-left: 4px solid var(--neon-teal);
+        }
+
+        .actions-info {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .actions-info-icon {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--neon-teal), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 210, 0.3));
+        }
+
+        .actions-info-text h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.2rem;
+        }
+
+        .actions-info-text p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .actions-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 900px) {
+            .actions-card {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .actions-info {
+                flex-direction: column;
+                gap: 0.8rem;
+            }
+            .actions-buttons {
+                justify-content: center;
+            }
+            .actions-buttons button {
+                flex: 1;
+                min-width: 180px;
+            }
+        }
+        #drop-zone.dragover {
+            border-color: var(--neon-purple) !important;
+            background: rgba(189, 0, 255, 0.08) !important;
+            box-shadow: 0 0 20px rgba(189, 0, 255, 0.3) !important;
+            transform: scale(1.01);
+        }
     </style>
 </head>
 <body>
@@ -542,6 +609,95 @@
                 </div>
             </div>
             
+        </div>
+
+        <!-- Global Actions Card -->
+        <div class="glass-card actions-card">
+            <div class="actions-info">
+                <div class="actions-info-icon">
+                    <i class="fa-solid fa-play-pause"></i>
+                </div>
+                <div class="actions-info-text">
+                    <h3>Controle Global da Automação</h3>
+                    <p>Gerencie a execução de todas as partes do processo simultaneamente em segundo plano.</p>
+                </div>
+            </div>
+            <div class="actions-buttons">
+                <button class="btn" id="btn-start-all" onclick="startAllProcesses()" style="background: linear-gradient(135deg, var(--neon-teal), var(--neon-purple)); color: #fff; width: 230px;">
+                    <i class="fa-solid fa-play"></i> Iniciar Todos os Lotes
+                </button>
+                <button class="btn btn-stop" id="btn-stop-all" onclick="stopAllProcesses()" style="width: 230px;">
+                    <i class="fa-solid fa-stop"></i> Parar Todos os Lotes
+                </button>
+            </div>
+        </div>
+
+        <!-- Card de Importação de Planilha -->
+        <div class="glass-card" style="border-left: 4px solid var(--neon-purple); background: rgba(17, 24, 39, 0.85); margin-bottom: 0;">
+            <div class="card-title">
+                <i class="fa-solid fa-file-import" style="background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i> Importar Novos Produtos (Planilha)
+            </div>
+            
+            <div class="import-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center;">
+                <!-- Drag and Drop Zone -->
+                <div id="drop-zone" style="border: 2px dashed rgba(189, 0, 255, 0.4); border-radius: 12px; padding: 2rem; text-align: center; background: rgba(189, 0, 255, 0.02); cursor: pointer; transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                    <div style="font-size: 2.5rem; background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 8px rgba(189, 0, 255, 0.3));">
+                        <i class="fa-solid fa-cloud-arrow-up" id="upload-icon"></i>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 0.2rem;">Arraste e solte sua planilha aqui</h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">Suporta arquivos formatados em .xlsx ou .csv</p>
+                    </div>
+                    <input type="file" id="file-input" accept=".xlsx, .csv" style="display: none;">
+                    <button class="btn" style="background: linear-gradient(135deg, var(--neon-purple), #ff007a); color: #fff; height: 36px; padding: 0 1.25rem; font-size: 0.85rem;" onclick="document.getElementById('file-input').click()">
+                        Selecionar Arquivo
+                    </button>
+                </div>
+                
+                <!-- Results & Progress Panel -->
+                <div id="import-status-panel" style="display: flex; flex-direction: column; gap: 1rem; min-height: 150px; justify-content: center;">
+                    <div id="import-waiting" style="text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 1rem; line-height: 1.4;">
+                        <i class="fa-solid fa-circle-info" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; color: var(--neon-purple);"></i>
+                        <span>Aguardando arquivo para importação. O sistema filtrará automaticamente itens duplicados comparando o Registro ANVISA com a planilha do Sheets.</span>
+                    </div>
+                    
+                    <div id="import-processing" style="display: none; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="font-weight: 500;"><i class="fa-solid fa-spinner fa-spin" style="color: var(--neon-purple); margin-right: 0.5rem;"></i>Processando planilha...</span>
+                            <span id="import-progress-percent" style="font-weight: 600; color: #fff;">0%</span>
+                        </div>
+                        <div class="progress-bar-bg" style="height: 8px;">
+                            <div class="progress-bar part-2-color" id="import-progress-bar" style="width: 0%;"></div>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Aguardando resposta da API do Google Sheets. Novos itens serão incluídos no fim da planilha.</p>
+                    </div>
+                    
+                    <div id="import-result" style="display: none; padding: 1rem;">
+                        <h4 style="font-size: 1.05rem; font-weight: 600; color: #fff; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fa-solid fa-circle-check" style="color: var(--neon-green);"></i> Importação Concluída!
+                        </h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem;">
+                            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--neon-purple);" id="res-total-analisados">0</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Lidos</div>
+                            </div>
+                            <div style="background: rgba(57, 255, 20, 0.02); border: 1px solid rgba(57, 255, 20, 0.1); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--neon-green);" id="res-novos-adicionados">0</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Novos</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-muted);" id="res-duplicados-ignorados">0</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Duplicados</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-muted);" id="res-vazios-ignorados">0</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Vazios</div>
+                            </div>
+                        </div>
+                        <p id="import-result-msg" style="font-size: 0.8rem; margin-top: 0.75rem; color: var(--text-muted); line-height: 1.3;"></p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Scrapers Grid -->
@@ -759,6 +915,7 @@
             loadConfig();
             loadStats();
             checkProcessesRunning();
+            initUploadHandler();
             
             // Formulário de configuração
             document.getElementById('config-form').addEventListener('submit', (e) => {
@@ -782,6 +939,122 @@
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 3000);
+        }
+
+        // Inicializa os manipuladores do upload da planilha
+        function initUploadHandler() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            
+            if (!dropZone || !fileInput) return;
+            
+            // Eventos do Drag & Drop
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length) {
+                    handleFile(files[0]);
+                }
+            }, false);
+            
+            fileInput.addEventListener('change', (e) => {
+                if (fileInput.files.length) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+            
+            // Ao clicar na zona (se não for no botão que já dispara o clique)
+            dropZone.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'BUTTON') {
+                    fileInput.click();
+                }
+            });
+        }
+        
+        async function handleFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'xlsx' && ext !== 'csv') {
+                showToast("Formato inválido. Por favor, envie um arquivo .xlsx ou .csv.", true);
+                return;
+            }
+            
+            // Transiciona UI para processando
+            document.getElementById('import-waiting').style.display = 'none';
+            document.getElementById('import-result').style.display = 'none';
+            document.getElementById('import-processing').style.display = 'block';
+            
+            // Simula um progresso no frontend (enquanto faz o upload real)
+            let percent = 0;
+            updateImportProgressBar(0);
+            
+            const progressInterval = setInterval(() => {
+                if (percent < 90) {
+                    percent += Math.floor(Math.random() * 15) + 5;
+                    if (percent > 90) percent = 90;
+                    updateImportProgressBar(percent);
+                }
+            }, 300);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                clearInterval(progressInterval);
+                updateImportProgressBar(100);
+                
+                setTimeout(() => {
+                    document.getElementById('import-processing').style.display = 'none';
+                    if (data.success) {
+                        // Mostra painel de resultados
+                        document.getElementById('import-result').style.display = 'block';
+                        document.getElementById('res-total-analisados').innerText = data.total_analisados;
+                        document.getElementById('res-novos-adicionados').innerText = data.novos_adicionados;
+                        document.getElementById('res-duplicados-ignorados').innerText = data.duplicados_ignorados;
+                        document.getElementById('res-vazios-ignorados').innerText = data.vazios_ignorados;
+                        document.getElementById('import-result-msg').innerText = data.message;
+                        
+                        showToast("Planilha importada com sucesso!");
+                        
+                        // Atualiza as estatísticas globais do painel
+                        loadStats();
+                    } else {
+                        // Retorna para o estado de espera e mostra o erro
+                        document.getElementById('import-waiting').style.display = 'block';
+                        showToast("Erro na importação: " + data.message, true);
+                    }
+                }, 400);
+                
+            } catch (error) {
+                clearInterval(progressInterval);
+                document.getElementById('import-processing').style.display = 'none';
+                document.getElementById('import-waiting').style.display = 'block';
+                showToast("Falha de rede ao tentar importar a planilha.", true);
+            }
+        }
+        
+        function updateImportProgressBar(percent) {
+            document.getElementById('import-progress-percent').innerText = `${percent}%`;
+            document.getElementById('import-progress-bar').style.width = `${percent}%`;
         }
 
         // Carrega configurações do servidor
@@ -959,6 +1232,19 @@
             eventSources[part].addEventListener('log', (event) => {
                 const text = event.data;
                 
+                // Se for a tag de progresso, não imprime no console, apenas atualiza a barra
+                if (text.includes('[PROGRESS]')) {
+                    const match = text.match(/\[PROGRESS\] (\d+)\/(\d+)/);
+                    if (match && match[1] && match[2]) {
+                        const current = parseInt(match[1]);
+                        const total = parseInt(match[2]);
+                        progressData[part].current_count = current;
+                        progressData[part].total_count = total;
+                        updateProgress(part);
+                    }
+                    return;
+                }
+                
                 // Determina classe de estilo baseada no log
                 let cls = 'info';
                 if (text.includes('[ERROR]')) cls = 'error';
@@ -967,21 +1253,19 @@
                 
                 appendConsoleLine(part, cls, text);
                 
-                // Parse do progresso
-                // Formato do log: "Processando linha 234: Registro..."
+                // Parse da linha física atual
                 if (text.includes('Processando linha')) {
                     const match = text.match(/Processando linha (\d+):/);
                     if (match && match[1]) {
                         const line = parseInt(match[1]);
-                        progressData[part].current = line;
+                        progressData[part].current_line = line;
                         updateProgress(part);
                     }
                 } else if (text.includes('atualizado há') && text.includes('Pulando')) {
-                    // Formato: "Linha 23: Registro '...' atualizado..."
                     const match = text.match(/Linha (\d+):/);
                     if (match && match[1]) {
                         const line = parseInt(match[1]);
-                        progressData[part].current = line;
+                        progressData[part].current_line = line;
                         updateProgress(part);
                     }
                 }
@@ -995,7 +1279,11 @@
                 if (data.success) {
                     appendConsoleLine(part, "success", "--- PROCESSAMENTO CONCLUÍDO COM SUCESSO! ---");
                     // Preenche a barra em 100%
-                    progressData[part].current = progressData[part].end;
+                    if (progressData[part].total_count) {
+                        progressData[part].current_count = progressData[part].total_count;
+                    } else {
+                        progressData[part].current = progressData[part].end;
+                    }
                     updateProgress(part);
                     showToast(`Parte ${part} finalizada com sucesso!`);
                 } else {
@@ -1075,33 +1363,77 @@
 
         // Atualiza os labels textuais do progresso
         function updateProgressLabels(part) {
-            const start = progressData[part].start;
-            const end = progressData[part].end;
-            const current = progressData[part].current || start;
-            document.getElementById(`lines-progress-${part}`).innerText = `Linhas: ${current} / ${end}`;
+            if (progressData[part].total_count) {
+                const current = progressData[part].current_count || 0;
+                const total = progressData[part].total_count;
+                const line = progressData[part].current_line || '-';
+                document.getElementById(`lines-progress-${part}`).innerText = `Progresso: ${current}/${total} (Linha ${line})`;
+            } else {
+                const start = progressData[part].start;
+                const end = progressData[part].end;
+                const current = progressData[part].current || start;
+                document.getElementById(`lines-progress-${part}`).innerText = `Linhas: ${current} / ${end}`;
+            }
         }
 
         // Atualiza a barra e a porcentagem de progresso
         function updateProgress(part) {
-            const start = progressData[part].start;
-            const end = progressData[part].end;
-            let current = progressData[part].current;
-            
-            if (current < start) current = start;
-            if (current > end) current = end;
-            
-            const total = end - start + 1;
-            const processed = current - start;
-            
             let percent = 0;
-            if (total > 0 && processed >= 0) {
-                percent = Math.round((processed / total) * 100);
+            
+            if (progressData[part].total_count) {
+                const current = progressData[part].current_count || 0;
+                const total = progressData[part].total_count;
+                if (total > 0) {
+                    percent = Math.round((current / total) * 100);
+                }
+                updateProgressLabels(part);
+            } else {
+                const start = progressData[part].start;
+                const end = progressData[part].end;
+                let current = progressData[part].current;
+                
+                if (current < start) current = start;
+                if (current > end) current = end;
+                
+                const total = end - start + 1;
+                const processed = current - start;
+                
+                if (total > 0 && processed >= 0) {
+                    percent = Math.round((processed / total) * 100);
+                }
+                updateProgressLabels(part);
             }
+            
             if (percent > 100) percent = 100;
             
             document.getElementById(`percent-${part}`).innerText = `${percent}%`;
             document.getElementById(`bar-part-${part}`).style.width = `${percent}%`;
-            document.getElementById(`lines-progress-${part}`).innerText = `Linhas: ${current} / ${end}`;
+        }
+
+        // Inicia todos os processos de uma vez
+        async function startAllProcesses() {
+            showToast("Disparando todos os lotes em paralelo...");
+            const promises = [1, 2, 3, 4].map(part => {
+                const startBtn = document.getElementById(`btn-start-${part}`);
+                if (startBtn && !startBtn.disabled) {
+                    return startProcess(part);
+                }
+                return Promise.resolve();
+            });
+            await Promise.all(promises);
+        }
+
+        // Interrompe todos os processos ativos
+        async function stopAllProcesses() {
+            showToast("Parando todos os lotes ativos...");
+            const promises = [1, 2, 3, 4].map(part => {
+                const stopBtn = document.getElementById(`btn-stop-${part}`);
+                if (stopBtn && !stopBtn.disabled) {
+                    return stopProcess(part);
+                }
+                return Promise.resolve();
+            });
+            await Promise.all(promises);
         }
     </script>
 </body>

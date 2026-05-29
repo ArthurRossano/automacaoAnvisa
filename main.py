@@ -111,76 +111,136 @@ def get_google_sheets_client():
 def search_registry_visual(page, registro_limpo):
     """
     Executa a pesquisa visual no portal da ANVISA.
-    Preenche o input, clica em buscar e lê o resultado da tabela.
+    Preenche o input, clica em buscar e lê o resultado da tabela,
+    e em seguida acessa os detalhes do produto para obter a Classe de Risco.
+    Se o registro não for encontrado na primeira tentativa, faz mais uma tentativa
+    limpando o estado da página completamente.
     """
-    try:
-        # 1. Tenta limpar os filtros anteriores de forma rápida.
-        # Se falhar (botão indisponível ou página travada), recarrega a página.
+    max_tentativas = 2
+    for tentativa in range(1, max_tentativas + 1):
         try:
-            page.click('input.btn-default', timeout=2000)
-            time.sleep(0.3)
-        except Exception:
-            logger.warning("Página travada ou botão Limpar indisponível. Recarregando portal...")
-            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=30000)
-            time.sleep(3)
-        
-        # 2. Aguarda o input estar disponível dinamicamente (evita sleep estático longo)
-        page.wait_for_selector('input[ng-model="filter.numeroRegistro"]', state="visible", timeout=5000)
-        
-        # 3. Digita o registro no input do AngularJS
-        logger.info(f"Digitando registro '{registro_limpo}'...")
-        page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo, timeout=3000)
-        
-        # 4. Clica no botão de consulta
-        logger.info("Clicando em Consultar...")
-        page.click('input.btn-primary', timeout=3000)
-        
-        # 5. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
-        start_time = time.time()
-        found_data = False
-        no_records = False
-        
-        while time.time() - start_time < 8:
-            # Verifica se a tabela com linhas de dados (td) apareceu
-            if page.query_selector("table tbody tr td"):
-                found_data = True
-                break
-            # Verifica se o aviso de "não foram encontrados registros" está na página
-            page_content = page.content()
-            if "Não foram encontrados registros" in page_content or "não foram encontrados" in page_content.lower():
-                no_records = True
-                break
-            time.sleep(0.3)
+            logger.info(f"Iniciando busca do registro '{registro_limpo}' (Tentativa {tentativa}/{max_tentativas})...")
             
-        if no_records:
-            logger.info(f"Registro '{registro_limpo}' não foi encontrado no portal.")
-            return None, "Não Encontrado"
+            # Se for a segunda tentativa, força o recarregamento completo da página
+            if tentativa > 1:
+                logger.info(f"Forçando recarregamento completo para nova verificação do registro '{registro_limpo}'...")
+                page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=45000)
+                time.sleep(3)
+            else:
+                # Na primeira tentativa, tenta limpar os filtros anteriores
+                try:
+                    page.click('input.btn-default', timeout=2000)
+                    time.sleep(0.3)
+                except Exception:
+                    logger.warning("Página travada ou botão Limpar indisponível. Recarregando portal...")
+                    page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(3)
             
-        if not found_data:
-            logger.warning(f"Timeout aguardando resultados para o registro '{registro_limpo}'.")
-            return None, "Timeout/Erro"
+            # 2. Aguarda o input estar disponível dinamicamente
+            page.wait_for_selector('input[ng-model="filter.numeroRegistro"]', state="visible", timeout=5000)
             
-        # 6. Extrai as linhas da tabela
-        rows = page.query_selector_all("table tbody tr")
-        for row in rows:
-            cells = row.query_selector_all("td")
-            if len(cells) >= 8:
-                registro_tabela = clean_registro(cells[2].inner_text().strip())
+            # 3. Digita o registro no input do AngularJS
+            logger.info(f"Digitando registro '{registro_limpo}'...")
+            page.fill('input[ng-model="filter.numeroRegistro"]', registro_limpo, timeout=3000)
+            
+            # 4. Clica no botão de consulta
+            logger.info("Clicando em Consultar...")
+            page.click('input.btn-primary', timeout=3000)
+            
+            # 5. Aguarda a tabela de resultados ou mensagem de "Nenhum registro"
+            start_time = time.time()
+            found_data = False
+            no_records = False
+            
+            while time.time() - start_time < 8:
+                # Verifica se a tabela com linhas de dados (td) apareceu
+                if page.query_selector("table tbody tr td"):
+                    found_data = True
+                    break
+                # Verifica se o aviso de "não foram encontrados registros" está na página
+                page_content = page.content()
+                if "Não foram encontrados registros" in page_content or "não foram encontrados" in page_content.lower():
+                    no_records = True
+                    break
+                time.sleep(0.3)
                 
-                # Double-check para confirmar que a linha corresponde ao registro buscado
-                if registro_tabela == registro_limpo:
-                    situacao = cells[5].inner_text().strip()
-                    validade = cells[7].inner_text().strip()
+            if no_records:
+                if tentativa < max_tentativas:
+                    logger.warning(f"Registro '{registro_limpo}' retornou 'Não Encontrado' na primeira tentativa. Tentando mais uma vez...")
+                    continue
+                else:
+                    logger.info(f"Registro '{registro_limpo}' não foi encontrado no portal após {max_tentativas} tentativas.")
+                    return None, "Não Encontrado", "Não Encontrada"
+                
+            if not found_data:
+                if tentativa < max_tentativas:
+                    logger.warning(f"Timeout aguardando resultados para o registro '{registro_limpo}' na primeira tentativa. Tentando mais uma vez...")
+                    continue
+                else:
+                    logger.warning(f"Timeout aguardando resultados para o registro '{registro_limpo}' após {max_tentativas} tentativas.")
+                    return None, "Timeout/Erro", "Não Encontrada"
+                
+            # 6. Extrai as linhas da tabela e acessa os detalhes do produto correspondente
+            rows = page.query_selector_all("table tbody tr")
+            for row in rows:
+                cells = row.query_selector_all("td")
+                if len(cells) >= 8:
+                    registro_tabela = clean_registro(cells[2].inner_text().strip())
                     
-                    logger.info(f"Registro '{registro_limpo}' localizado! Situação: {situacao}, Validade: {validade}")
-                    return validade, situacao
-                    
-        logger.warning(f"Tabela de resultados carregada, mas não continha correspondência para o registro '{registro_limpo}'.")
-        return None, "Não Encontrado"
-        
-    except Exception as e:
-        logger.error(f"Erro ao realizar busca do registro '{registro_limpo}': {e}")
-        return None, "Erro na Busca"
+                    # Double-check para confirmar que a linha corresponde ao registro buscado
+                    if registro_tabela == registro_limpo:
+                        situacao = cells[5].inner_text().strip()
+                        validade = cells[7].inner_text().strip()
+                        
+                        logger.info(f"Registro '{registro_limpo}' localizado! Situação: {situacao}, Validade: {validade}. Acessando detalhes para obter Classe de Risco...")
+                        
+                        classe_risco = "Não Encontrada"
+                        try:
+                            # Clica no segundo TD (Nome do Produto) que contém o trigger de clique para os detalhes
+                            cells[1].click()
+                            
+                            # Aguarda o elemento da Classificação de Risco na página de detalhes
+                            page.wait_for_selector('xpath=//th[contains(text(), "Classificação de Risco")]', timeout=6000)
+                            
+                            # Loop de espera ativa para o AngularJS carregar o valor real no TD (que inicialmente pode ser "-" ou vazio)
+                            start_wait = time.time()
+                            while time.time() - start_wait < 5:
+                                val = page.locator('xpath=//th[contains(text(), "Classificação de Risco")]/following-sibling::td').first.inner_text().strip()
+                                if val and val != "-":
+                                    classe_risco = val
+                                    break
+                                time.sleep(0.2)
+                                
+                            logger.info(f"Classe de Risco extraída: '{classe_risco}'")
+                        except Exception as e_detail:
+                            logger.error(f"Erro ao acessar/extrair detalhes do registro '{registro_limpo}': {e_detail}")
+                            
+                        # Recarrega diretamente o portal de consultas para garantir um estado limpo
+                        logger.info("Recarregando portal de consultas para a próxima busca...")
+                        try:
+                            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=20000)
+                            time.sleep(2)
+                        except Exception as e_goto:
+                            logger.warning(f"Erro ao recarregar o portal: {e_goto}. Tentando recarregar novamente...")
+                            page.goto("https://consultas.anvisa.gov.br/#/saude/", wait_until="domcontentloaded", timeout=30000)
+                            time.sleep(3)
+                            
+                        return validade, situacao, classe_risco
+            
+            # Se a tabela carregou mas não continha correspondência
+            if tentativa < max_tentativas:
+                logger.warning(f"Tabela de resultados carregada para '{registro_limpo}', mas sem correspondência na primeira tentativa. Tentando mais uma vez...")
+                continue
+            else:
+                logger.warning(f"Tabela de resultados carregada, mas não continha correspondência para o registro '{registro_limpo}' após {max_tentativas} tentativas.")
+                return None, "Não Encontrado", "Não Encontrada"
+                
+        except Exception as e:
+            logger.error(f"Erro ao realizar busca do registro '{registro_limpo}' na tentativa {tentativa}: {e}")
+            if tentativa < max_tentativas:
+                continue
+            else:
+                return None, "Erro na Busca", "Não Encontrada"
 
 def main():
     # Configura os argumentos de linha de comando para paralelismo dinâmico
@@ -213,43 +273,14 @@ def main():
     # Cria lista de tarefas mapeando para o índice físico das linhas no Google Sheets (linha 1 é cabeçalho, dados iniciam na 2)
     all_tasks = list(enumerate(records, start=2))
     
-    # Se o argumento --part for informado, divide as tarefas dinamicamente de acordo com o total de partes
-    if args.part:
-        total_parts = args.total_parts
-        part_idx = args.part
-        
-        if part_idx < 1 or part_idx > total_parts:
-            logger.error(f"Erro: O índice da parte ({part_idx}) deve ser entre 1 e total-parts ({total_parts}).")
-            return
-            
-        total_tasks = len(all_tasks)
-        # Calcula o tamanho de cada fatia (divisão inteira com teto)
-        chunk_size = (total_tasks + total_parts - 1) // total_parts
-        
-        start_idx = (part_idx - 1) * chunk_size
-        end_idx = min(start_idx + chunk_size, total_tasks)
-        
-        tasks_to_process = all_tasks[start_idx:end_idx]
-        
-        if tasks_to_process:
-            first_line = tasks_to_process[0][0]
-            last_line = tasks_to_process[-1][0]
-            logger.info(
-                f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. "
-                f"Processando linhas físicas de {first_line} até {last_line} (total: {len(tasks_to_process)} registros)."
-            )
-        else:
-            logger.info(f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. Nenhuma tarefa para processar neste lote.")
-            tasks_to_process = []
-    else:
-        tasks_to_process = all_tasks
-        logger.info(f"Modo Padrão ativo. Processando todas as {len(tasks_to_process)} linhas da planilha.")
+    # Divisão em lotes e agrupamento serão feitos após o mapeamento das colunas.
 
     # 3. Mapeia dinamicamente os índices das colunas de interesse
     col_registro_idx = None
     col_validade_idx = None
     col_situacao_idx = None
     col_atualizacao_idx = None
+    col_classe_idx = None
 
     for idx, header in enumerate(headers, start=1):
         header_lower = header.lower().strip()
@@ -270,9 +301,14 @@ def main():
                 col_situacao_idx = idx
                 
         # 4. Última Atualização (opcional)
-        elif any(term in header_lower for term in ["atualização", "atualizacao", "data consulta", "verificado"]):
+        elif any(term in header_lower for term in ["atualiz", "data consulta", "verificado"]):
             if col_atualizacao_idx is None:
                 col_atualizacao_idx = idx
+                
+        # 5. Classe de Risco (opcional)
+        elif any(term in header_lower for term in ["classe", "risco", "enquadramento"]):
+            if col_classe_idx is None:
+                col_classe_idx = idx
 
     if col_registro_idx is None:
         logger.error("Não foi possível localizar a coluna de 'Registro ANVISA' na planilha.")
@@ -282,7 +318,70 @@ def main():
         return
 
     logger.info(f"Mapeamento de colunas -> Registro: Col {col_registro_idx}, Validade: Col {col_validade_idx}, "
-                f"Situação: Col {col_situacao_idx or 'N/A'}, Atualização: Col {col_atualizacao_idx or 'N/A'}")
+                f"Situação: Col {col_situacao_idx or 'N/A'}, Atualização: Col {col_atualizacao_idx or 'N/A'}, "
+                f"Classe: Col {col_classe_idx or 'N/A'}")
+
+    # 3.5 Agrupamento por registro para evitar buscas duplicadas
+    grouped_tasks = {}
+    no_reg_tasks = []
+    
+    for idx, row in all_tasks:
+        registro_original = str(row.get(headers[col_registro_idx - 1], "")).strip()
+        registro_limpo = clean_registro(registro_original)
+        if not registro_limpo:
+            no_reg_tasks.append((idx, row))
+        else:
+            if registro_limpo not in grouped_tasks:
+                grouped_tasks[registro_limpo] = []
+            grouped_tasks[registro_limpo].append((idx, row))
+            
+    unique_regs = sorted(list(grouped_tasks.keys()))
+    
+    # Se o argumento --part for informado, divide as tarefas dinamicamente de acordo com o total de partes
+    if args.part:
+        total_parts = args.total_parts
+        part_idx = args.part
+        
+        if part_idx < 1 or part_idx > total_parts:
+            logger.error(f"Erro: O índice da parte ({part_idx}) deve ser entre 1 e total-parts ({total_parts}).")
+            return
+            
+        total_unique = len(unique_regs)
+        # Calcula o tamanho de cada fatia (divisão inteira com teto)
+        chunk_size = (total_unique + total_parts - 1) // total_parts
+        
+        start_idx = (part_idx - 1) * chunk_size
+        end_idx = min(start_idx + chunk_size, total_unique)
+        
+        part_regs = unique_regs[start_idx:end_idx]
+        
+        tasks_to_process = []
+        for reg in part_regs:
+            tasks_to_process.extend(grouped_tasks[reg])
+            
+        # Também divide tarefas sem registro entre as partes
+        total_no_reg = len(no_reg_tasks)
+        if total_no_reg > 0:
+            no_reg_chunk = (total_no_reg + total_parts - 1) // total_parts
+            nr_start = (part_idx - 1) * no_reg_chunk
+            nr_end = min(nr_start + no_reg_chunk, total_no_reg)
+            tasks_to_process.extend(no_reg_tasks[nr_start:nr_end])
+            
+        # Ordena as tarefas por índice de linha física para manter a progressão visual ascendente
+        tasks_to_process.sort(key=lambda t: t[0])
+        
+        if tasks_to_process:
+            first_line = tasks_to_process[0][0]
+            last_line = tasks_to_process[-1][0]
+            logger.info(
+                f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. "
+                f"Processando {len(tasks_to_process)} registros (de registros únicos agrupados, linhas de {first_line} até {last_line})."
+            )
+        else:
+            logger.info(f"Modo Paralelo (Parte {part_idx}/{total_parts}) ativo. Nenhuma tarefa para processar neste lote.")
+    else:
+        tasks_to_process = all_tasks
+        logger.info(f"Modo Padrão ativo. Processando todas as {len(tasks_to_process)} linhas da planilha.")
 
     # 4. Inicializa o Playwright e abre o portal de Saúde diretamente
     with sync_playwright() as p:
@@ -313,14 +412,55 @@ def main():
         # Lista para armazenar as células que serão atualizadas em lote
         cells_to_update = []
         batch_size = 20  # Grava no Google Sheets em lotes de 20 registros
+        
+        # Cache em memória para evitar buscas duplicadas no mesmo processo nesta rodada
+        cache_consultas = {}
 
         # 5. Itera sobre cada produto fatiado na planilha
-        for idx, row in tasks_to_process:
+        total_tasks = len(tasks_to_process)
+        for i, (idx, row) in enumerate(tasks_to_process):
+            # Log de progresso para atualização da interface do dashboard
+            logger.info(f"[PROGRESS] {i+1}/{total_tasks}")
+            
             registro_original = str(row.get(headers[col_registro_idx - 1], "")).strip()
             registro_limpo = clean_registro(registro_original)
             
             if not registro_limpo:
                 logger.info(f"Linha {idx}: Registro em branco. Pulando...")
+                continue
+
+            # Se já consultamos este registro nesta rodada, recupera os dados salvos em cache
+            if registro_limpo in cache_consultas:
+                validade, situacao, classe, consultado = cache_consultas[registro_limpo]
+                
+                # Se o registro foi apenas pulado por ter sido atualizado recentemente,
+                # nós só pulamos as duplicadas silenciosamente se a linha atual já possuir a Validade preenchida na planilha.
+                val_atual = str(row.get(headers[col_validade_idx - 1], "")).strip()
+                if not consultado and val_atual:
+                    logger.info(f"Linha {idx}: Registro '{registro_original}' já atualizado recentemente. Pulando duplicada...")
+                    continue
+                    
+                logger.info(f"Linha {idx}: Registro '{registro_original}' recuperado do cache local desta rodada. Pulando busca visual...")
+                
+                if validade:
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value=validade))
+                    if col_situacao_idx:
+                        cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value=situacao))
+                    if col_classe_idx:
+                        cells_to_update.append(gspread.cell.Cell(row=idx, col=col_classe_idx, value=classe))
+                else:
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value="Não Encontrado"))
+                    if col_situacao_idx:
+                        cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value="Inativo ou Não Encontrado"))
+                    if col_classe_idx:
+                        cells_to_update.append(gspread.cell.Cell(row=idx, col=col_classe_idx, value="Não Encontrada"))
+                
+                if col_atualizacao_idx:
+                    data_hoje = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_atualizacao_idx, value=data_hoje))
+                
+                if len(cells_to_update) >= (batch_size * 2):
+                    commit_batch(sheet, cells_to_update)
                 continue
 
             # Verifica a última atualização se a coluna existir
@@ -344,6 +484,11 @@ def main():
                                     f"Linha {idx}: Registro '{registro_original}' atualizado há {diferenca.days} dias "
                                     f"(há 7 dias ou menos). Pulando consulta..."
                                 )
+                                # Salva em cache informando que NÃO foi consultado nesta rodada (False)
+                                val_existente = row.get(headers[col_validade_idx - 1], "")
+                                sit_existente = row.get(headers[col_situacao_idx - 1], "") if col_situacao_idx else None
+                                classe_existente = row.get(headers[col_classe_idx - 1], "") if col_classe_idx else None
+                                cache_consultas[registro_limpo] = (val_existente, sit_existente, classe_existente, False)
                                 continue
                     except Exception as e:
                         logger.warning(
@@ -354,17 +499,24 @@ def main():
             logger.info(f"Processando linha {idx}: Registro '{registro_original}'...")
             
             # Faz a busca visual no portal
-            validade, situacao = search_registry_visual(page, registro_limpo)
+            validade, situacao, classe = search_registry_visual(page, registro_limpo)
+            
+            # Salva no cache local indicando que FOI consultado nesta rodada (True)
+            cache_consultas[registro_limpo] = (validade, situacao, classe, True)
             
             # Acumula os valores correspondentes de volta na memória para atualização em lote
             if validade:
                 cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value=validade))
                 if col_situacao_idx:
                     cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value=situacao))
+                if col_classe_idx:
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_classe_idx, value=classe))
             else:
                 cells_to_update.append(gspread.cell.Cell(row=idx, col=col_validade_idx, value="Não Encontrado"))
                 if col_situacao_idx:
                     cells_to_update.append(gspread.cell.Cell(row=idx, col=col_situacao_idx, value="Inativo ou Não Encontrado"))
+                if col_classe_idx:
+                    cells_to_update.append(gspread.cell.Cell(row=idx, col=col_classe_idx, value="Não Encontrada"))
             
             if col_atualizacao_idx:
                 data_hoje = datetime.now().strftime("%d/%m/%Y %H:%M")

@@ -29,3 +29,7 @@ ENV/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Local temporary files and scratch scripts
+scratch/
+temp_uploads/
